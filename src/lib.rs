@@ -86,6 +86,30 @@ where
 	}
 }
 
+/// Does one sub-step of substitute
+///
+/// Returns Some((replacement_string, next_position_in_source_str_after_variable_name)) when succeeded.
+/// Returns None if no substitution was possible.
+pub fn substitute_one_step<'a, M>(source: &str, variables: &'a M) -> Result<Option<(String, usize)>, Error>
+where
+	M: VariableMap<'a> + ?Sized,
+	M::Value: AsRef<str>,
+{
+	let mut output = Vec::with_capacity(source.len() + source.len() / 10);
+	let new_finger_option = substitute_impl_one_step(0, &mut output, source.as_bytes(), &(0..source.len()), variables, &|x| x.as_ref().as_bytes())?;
+
+	if new_finger_option.is_none() {
+		return Ok(None);
+	}
+
+	// SAFETY: Both source and all variable values are valid UTF-8, so substitation result is also valid UTF-8.
+	let output_str = unsafe {
+		String::from_utf8_unchecked(output)
+	};
+
+	Ok(Some((output_str, new_finger_option.unwrap())))
+}
+
 /// Substitute variables in a byte string.
 ///
 /// Variables have the form `$NAME`, `${NAME}` or `${NAME:default}`.
@@ -107,6 +131,41 @@ where
 	Ok(output)
 }
 
+fn substitute_impl_one_step<'a, M, F>(finger: usize, output: &mut Vec<u8>, source: &[u8], range: &std::ops::Range<usize>, variables: &'a M, to_bytes: &F) -> Result<Option<usize>, Error>
+where
+	M: VariableMap<'a> + ?Sized,
+	F: Fn(&M::Value) -> &[u8],
+{
+	let next = match memchr::memchr2(b'$', b'\\', &source[finger..range.end]) {
+		Some(x) => finger + x,
+		None => return Ok(None),
+	};
+
+	output.extend_from_slice(&source[finger..next]);
+	if source[next] == b'\\' {
+		output.push(unescape_one(source, next)?);
+		return Ok(Some(next + 2));
+	} else {
+		let variable = parse_variable(source, next)?;
+		let value = variables.get(variable.name);
+		match (&value, &variable.default) {
+			(None, None) => return Err(error::NoSuchVariable {
+				position: variable.name_start,
+				name: variable.name.to_owned(),
+			}.into()),
+			(Some(value), _) => {
+				output.extend_from_slice(to_bytes(value));
+			}
+			(None, Some(default)) => {
+				substitute_impl(output, source, default.clone(), variables, to_bytes)?;
+			}
+		};
+		return Ok(Some(variable.end_position));
+	}
+
+
+}
+
 /// Substitute variables in a byte string.
 ///
 /// This is the real implementation used by both [`substitute`] and [`substitute_bytes`].
@@ -118,31 +177,11 @@ where
 {
 	let mut finger = range.start;
 	while finger < range.end {
-		let next = match memchr::memchr2(b'$', b'\\', &source[finger..range.end]) {
-			Some(x) => finger + x,
-			None => break,
-		};
-
-		output.extend_from_slice(&source[finger..next]);
-		if source[next] == b'\\' {
-			output.push(unescape_one(source, next)?);
-			finger = next + 2;
+		let new_finger_option = substitute_impl_one_step(finger, output, source, &range, variables, to_bytes)?;
+		if let Some(new_finger) = new_finger_option {
+			finger = new_finger;
 		} else {
-			let variable = parse_variable(source, next)?;
-			let value = variables.get(variable.name);
-			match (&value, &variable.default) {
-				(None, None) => return Err(error::NoSuchVariable {
-					position: variable.name_start,
-					name: variable.name.to_owned(),
-				}.into()),
-				(Some(value), _) => {
-					output.extend_from_slice(to_bytes(value));
-				}
-				(None, Some(default)) => {
-					substitute_impl(output, source, default.clone(), variables, to_bytes)?;
-				}
-			};
-			finger = variable.end_position;
+			break;
 		}
 	}
 
