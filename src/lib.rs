@@ -144,7 +144,7 @@ where
 	output.extend_from_slice(&source[finger..next]);
 	if source[next] == b'\\' {
 		output.push(unescape_one(source, next)?);
-		return Ok(Some(next + 2));
+		Ok(Some(next + 2))
 	} else {
 		let variable = parse_variable(source, next)?;
 		let value = variables.get(variable.name);
@@ -160,7 +160,7 @@ where
 				substitute_impl(output, source, default.clone(), variables, to_bytes)?;
 			}
 		};
-		return Ok(Some(variable.end_position));
+		Ok(Some(variable.end_position))
 	}
 
 
