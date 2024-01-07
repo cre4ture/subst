@@ -126,13 +126,7 @@ mod test {
 		let mut variables = HashMap::new();
 		variables.insert("bar", "aap");
 		variables.insert("baz", "noot");
-		let_assert!(Ok(parsed) = from_str(
-			concat!(
-				"bar: $bar\n",
-				"baz: $baz/with/stuff\n",
-			),
-			&variables,
-		));
+		let_assert!(Ok(parsed) = from_str(concat!("bar: $bar\n", "baz: $baz/with/stuff\n",), &variables,));
 
 		let parsed: Struct = parsed;
 		assert!(parsed.bar == "aap");
@@ -150,13 +144,7 @@ mod test {
 		let mut variables = HashMap::new();
 		variables.insert("bar", "aap");
 		variables.insert("baz", "noot");
-		let_assert!(Ok(parsed) = from_str(
-			concat!(
-				"bar: aap\n",
-				"baz: noot/with/stuff\n",
-			),
-			&crate::NoSubstitution,
-		));
+		let_assert!(Ok(parsed) = from_str(concat!("bar: aap\n", "baz: noot/with/stuff\n",), &crate::NoSubstitution,));
 
 		let parsed: Struct = parsed;
 		assert!(parsed.bar == "aap");
@@ -174,13 +162,7 @@ mod test {
 		let mut variables = HashMap::new();
 		variables.insert("bar", "aap\nbaz: mies");
 		variables.insert("baz", "noot");
-		let_assert!(Ok(parsed) = from_str(
-			concat!(
-				"bar: $bar\n",
-				"baz: $baz\n",
-			),
-			&variables,
-		));
+		let_assert!(Ok(parsed) = from_str(concat!("bar: $bar\n", "baz: $baz\n",), &variables,));
 
 		let parsed: Struct = parsed;
 		assert!(parsed.bar == "aap\nbaz: mies");
@@ -198,13 +180,7 @@ mod test {
 		let mut variables = HashMap::new();
 		variables.insert("bar", "aap\nbaz: mies");
 		variables.insert("baz", "noot");
-		let_assert!(Ok(parsed) = from_str(
-			concat!(
-				"bar: !!string $bar\n",
-				"baz: $baz\n",
-			),
-			&variables,
-		));
+		let_assert!(Ok(parsed) = from_str(concat!("bar: !!string $bar\n", "baz: $baz\n",), &variables,));
 
 		let parsed: Struct = parsed;
 		assert!(parsed.bar == "aap\nbaz: mies");
@@ -224,13 +200,7 @@ mod test {
 		variables.insert("baz", "noot");
 		let variables: &dyn VariableMap<Value = &&str> = &variables;
 
-		let_assert!(Ok(parsed) = from_str(
-			concat!(
-				"bar: $bar\n",
-				"baz: $baz/with/stuff\n",
-			),
-			variables,
-		));
+		let_assert!(Ok(parsed) = from_str(concat!("bar: $bar\n", "baz: $baz/with/stuff\n",), variables,));
 
 		let parsed: Struct = parsed;
 		assert!(parsed.bar == "aap");
